@@ -1,0 +1,122 @@
+<div class="workspace-shell">
+  <main class="main-content">
+    <header class="app-header">
+      <div class="app-title">
+        <span class="brand-mark"><svg lucidePackage [size]="20"></svg></span>
+        <div><h1>Post Office Management</h1><p>Manage post offices and shipments</p></div>
+      </div>
+      <nav class="primary-nav" aria-label="Main navigation" role="tablist">
+        <button class="nav-item" type="button" role="tab" [attr.aria-selected]="view() === 'offices'" [class.active]="view() === 'offices'" (click)="setView('offices')">Post offices</button>
+        <button class="nav-item" type="button" role="tab" [attr.aria-selected]="view() === 'shipments'" [class.active]="view() === 'shipments'" (click)="setView('shipments')">Shipments</button>
+      </nav>
+    </header>
+
+    @if (notice()) {
+      <div class="toast success-toast" role="status"><svg lucideCircleCheck [size]="17"></svg><span>{{ notice() }}</span><button type="button" aria-label="Dismiss notification" (click)="notice.set('')"><svg lucideX [size]="16"></svg></button></div>
+    }
+    @if (error() && !dialog()) {
+      <div class="toast error-toast" role="alert"><svg lucideAlertCircle [size]="17"></svg><span>{{ error() }}</span><button type="button" aria-label="Dismiss error" (click)="error.set('')"><svg lucideX [size]="16"></svg></button></div>
+    }
+
+    @if (view() === 'shipments') {
+      <section class="page-heading">
+        <div>
+          <h2>Shipments</h2>
+          <p>Track and update parcel records.</p>
+        </div>
+        <button class="button button-primary" type="button" (click)="openNewShipment()"><svg lucidePlus [size]="17"></svg><span>New shipment</span></button>
+      </section>
+
+      <section class="register-section">
+        <div class="section-heading">
+          <div><h2>Package register</h2><p>Search, filter and update shipment records.</p></div>
+          <button class="icon-button refresh-button" type="button" aria-label="Refresh shipment list" title="Refresh" [disabled]="loading()" (click)="loadShipments()"><svg lucideRefreshCw [size]="17"></svg></button>
+        </div>
+
+        <div class="filter-panel">
+          <label class="filter-field search-field"><span>Shipment number</span><span class="input-wrap"><svg lucideSearch [size]="16"></svg><input type="search" placeholder="Search ID number" [(ngModel)]="filters.shipmentNumber" (keydown.enter)="applyFilters()"></span></label>
+          <label class="filter-field"><span>Status</span><select [(ngModel)]="filters.status"><option [ngValue]="null">All statuses</option>@for (option of statusOptions; track option.value) { <option [ngValue]="option.value">{{ option.label }}</option> }</select></label>
+          <label class="filter-field"><span>Weight</span><select [(ngModel)]="filters.weight"><option [ngValue]="null">All weights</option>@for (option of weightOptions; track option.value) { <option [ngValue]="option.value">{{ option.label }}</option> }</select></label>
+          <label class="filter-field"><span>Type</span><select [(ngModel)]="filters.shipmentType"><option value="">All types</option><option value="Package">Package</option><option value="Letter">Letter</option></select></label>
+          <label class="filter-field location-field"><span>Current post office ID</span><input type="text" placeholder="Filter by office UUID" [(ngModel)]="filters.locationPostOfficeId" (keydown.enter)="applyFilters()"></label>
+          <div class="filter-actions"><button class="button button-dark" type="button" (click)="applyFilters()">Apply filters</button><button class="text-button" type="button" (click)="clearFilters()">Clear</button></div>
+        </div>
+
+        <div class="table-frame">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Shipment</th><th>Route</th><th>Weight</th><th>Current location</th><th>Status</th><th>Received</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                @if (loading()) {
+                  <tr><td colspan="7" class="state-cell"><span class="loading-mark"></span>Loading shipment records...</td></tr>
+                } @else if (shipments().length === 0) {
+                  <tr><td colspan="7" class="state-cell empty-state"><span class="empty-mark"><svg lucidePackage [size]="22"></svg></span><strong>No shipments found</strong><span>Adjust the filters or register a new shipment.</span><button class="text-button" type="button" (click)="clearFilters()">Clear all filters</button></td></tr>
+                } @else {
+                  @for (shipment of shipments(); track shipment.id) {
+                    <tr>
+                      <td><div class="shipment-cell"><span class="shipment-glyph" [class.letter-glyph]="shipment.shipmentType.toLowerCase() === 'letter'">@if (shipment.shipmentType.toLowerCase() === 'letter') { <span>L</span> } @else { <svg lucidePackage [size]="17"></svg> }</span><span><strong>{{ shipment.shipmentNumber }}</strong><small>{{ shipment.shipmentType }} · {{ shortId(shipment.id) }}</small></span></div></td>
+                      <td><div class="route-cell"><span>{{ shortId(shipment.originPostOfficeId) }}</span><svg lucideArrowRight [size]="14"></svg><span>{{ shortId(shipment.destinationPostOfficeId) }}</span></div></td>
+                      <td><strong class="weight-value">{{ shipment.weightKg | number:'1.0-2' }} kg</strong><small class="table-subtext">{{ weightLabel(shipment.weightCategory) }}</small></td>
+                      <td><span class="location-value"><svg lucideMapPin [size]="14"></svg>{{ officeName(shipment.currentPostOfficeId) }}</span></td>
+                      <td><span class="status-pill" [class]="'status-pill ' + statusClass(shipment.status)"><span class="pill-dot"></span>{{ statusLabel(shipment.status) }}</span></td>
+                      <td><span class="date-value">{{ shipment.createdAtUtc | date:'dd MMM yyyy' }}</span><small class="table-subtext">{{ shipment.createdAtUtc | date:'HH:mm' }} UTC</small></td>
+                      <td><div class="row-actions"><button class="icon-button" type="button" title="Edit shipment" [attr.aria-label]="'Edit ' + shipment.shipmentNumber" (click)="openEditShipment(shipment)"><svg lucidePencil [size]="15"></svg></button>@if (shipment.status !== ShipmentStatus.Delivered) { <button class="advance-button" type="button" [attr.aria-label]="'Advance status for ' + shipment.shipmentNumber" title="Advance shipment status" (click)="openStatusUpdate(shipment)"><svg lucideArrowRight [size]="15"></svg></button> }<button class="icon-button danger-action" type="button" title="Delete shipment" [attr.aria-label]="'Delete ' + shipment.shipmentNumber" (click)="deleteShipment(shipment)"><svg lucideTrash2 [size]="15"></svg></button></div></td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+          <footer class="table-footer"><span>Showing <strong>{{ resultRange() }}</strong> of <strong>{{ totalCount() }}</strong></span><div class="pagination"><label>Rows <select [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); pageNumber.set(1); loadShipments()"><option [ngValue]="10">10</option><option [ngValue]="20">20</option><option [ngValue]="50">50</option></select></label><button class="icon-button" type="button" aria-label="Previous page" [disabled]="pageNumber() <= 1 || loading()" (click)="changePage(-1)"><svg lucideChevronLeft [size]="17"></svg></button><span class="page-number">{{ totalPages() ? pageNumber() : 0 }} / {{ totalPages() }}</span><button class="icon-button" type="button" aria-label="Next page" [disabled]="pageNumber() >= totalPages() || loading()" (click)="changePage(1)"><svg lucideChevronRight [size]="17"></svg></button></div></footer>
+        </div>
+      </section>
+    } @else {
+      <section class="page-heading">
+        <div><h2>Post offices</h2><p>Manage offices used for shipment routes.</p></div>
+        <button class="button button-primary" type="button" (click)="openNewOffice()"><svg lucidePlus [size]="17"></svg><span>Add post office</span></button>
+      </section>
+      <section class="office-lookup"><label for="office-id-lookup">Look up an existing office by ID</label><div class="lookup-controls"><input id="office-id-lookup" type="text" placeholder="Paste post office UUID" [(ngModel)]="officeLookupId" (keydown.enter)="lookupOffice()"><button class="button button-dark" type="button" [disabled]="saving() || !officeLookupId.trim()" (click)="lookupOffice()"><svg lucideSearch [size]="16"></svg>Find office</button></div></section>
+      <section class="register-section office-list-section"><div class="section-heading"><div><h2>Saved locations</h2><p>Recently created or retrieved post offices.</p></div></div><div class="table-frame"><div class="table-scroll"><table><thead><tr><th>Office</th><th>ZIP code</th><th>City</th><th>Office ID</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>@if (offices().length === 0) { <tr><td colspan="5" class="state-cell empty-state"><span class="empty-mark"><svg lucideBuilding2 [size]="22"></svg></span><strong>No saved offices</strong><span>Create an office or look one up by its ID.</span></td></tr> } @else { @for (office of offices(); track office.id) { <tr><td><div class="office-name-cell"><span class="office-glyph"><svg lucideBuilding2 [size]="17"></svg></span><strong>{{ office.name }}</strong></div></td><td><span class="zip-code">{{ office.zipCode }}</span></td><td>{{ office.city }}</td><td><span class="id-cell">{{ office.id }}</span></td><td><div class="row-actions"><button class="icon-button" type="button" title="Edit office" [attr.aria-label]="'Edit ' + office.name" (click)="openEditOffice(office)"><svg lucidePencil [size]="15"></svg></button><button class="icon-button danger-action" type="button" title="Delete office" [attr.aria-label]="'Delete ' + office.name" (click)="deleteOffice(office)"><svg lucideTrash2 [size]="15"></svg></button></div></td></tr> } }</tbody></table></div></div></section>
+    }
+  </main>
+</div>
+
+@if (dialog()) {
+  <div class="modal-backdrop" (click)="closeDialog()">
+    <section class="dialog" role="dialog" aria-modal="true" [attr.aria-label]="dialog() === 'shipment' ? (editingShipment ? 'Edit shipment' : 'New shipment') : dialog() === 'office' ? (editingOfficeId ? 'Edit post office' : 'Add post office') : 'Update shipment status'" (click)="$event.stopPropagation()">
+      <header class="dialog-header"><div><span class="dialog-kicker">{{ dialog() === 'office' ? 'NETWORK MANAGEMENT' : 'SHIPMENT CONTROL' }}</span><h2>{{ dialog() === 'shipment' ? (editingShipment ? 'Edit shipment' : 'Register shipment') : dialog() === 'office' ? (editingOfficeId ? 'Edit post office' : 'Add post office') : 'Advance shipment' }}</h2></div><button class="icon-button" type="button" aria-label="Close dialog" (click)="closeDialog()"><svg lucideX [size]="18"></svg></button></header>
+
+      @if (error()) { <div class="dialog-error" role="alert"><svg lucideAlertCircle [size]="17"></svg>{{ error() }}</div> }
+
+      @if (dialog() === 'shipment') {
+        <div class="dialog-content">
+          @if (editingShipment) { <div class="readonly-banner"><span>Shipment</span><strong>{{ editingShipment.shipmentNumber }}</strong><small>{{ editingShipment.shipmentType }}</small></div> }
+          <label class="form-field"><span>Shipment number</span><input type="text" [(ngModel)]="shipmentForm.shipmentNumber" [disabled]="!!editingShipment" placeholder="e.g. PO-2025-00481" required></label>
+          @if (!editingShipment) { <label class="form-field"><span>Shipment type</span><select [(ngModel)]="shipmentForm.shipmentType"><option value="Package">Package</option><option value="Letter">Letter</option></select></label> }
+          <label class="form-field"><span>Weight in kilograms</span><input type="number" min="0.01" step="0.01" [(ngModel)]="shipmentForm.weightKg" required></label>
+          <label class="form-field"><span>Origin post office ID</span><input list="known-offices" type="text" [(ngModel)]="shipmentForm.originPostOfficeId" placeholder="Paste office UUID" required></label>
+          <label class="form-field"><span>Destination post office ID</span><input list="known-offices" type="text" [(ngModel)]="shipmentForm.destinationPostOfficeId" placeholder="Paste office UUID" required></label>
+          <datalist id="known-offices">@for (office of offices(); track office.id) { <option [value]="office.id">{{ office.name }} · {{ office.zipCode }}</option> }</datalist>
+          <p class="field-note">Office IDs can be selected from saved locations or entered directly.</p>
+        </div>
+        <footer class="dialog-footer"><button class="button button-quiet" type="button" (click)="closeDialog()">Cancel</button><button class="button button-primary" type="button" [disabled]="saving() || !shipmentForm.shipmentNumber.trim() || !shipmentForm.originPostOfficeId.trim() || !shipmentForm.destinationPostOfficeId.trim() || shipmentForm.weightKg <= 0" (click)="saveShipment()">{{ saving() ? 'Saving...' : editingShipment ? 'Save changes' : 'Create shipment' }}</button></footer>
+      } @else if (dialog() === 'status') {
+        <div class="dialog-content">
+          <div class="status-route-banner"><span class="shipment-glyph"><svg lucidePackage [size]="17"></svg></span><div><strong>{{ statusShipment?.shipmentNumber }}</strong><small>{{ statusShipment ? statusLabel(statusShipment.status) : '' }}</small></div><svg lucideArrowRight [size]="17"></svg><span class="next-status-label">{{ statusLabel(statusForm.status) }}</span></div>
+          <label class="form-field"><span>New status</span><select [(ngModel)]="statusForm.status">@for (option of statusOptions; track option.value) { @if (option.value > (statusShipment?.status ?? -1)) { <option [ngValue]="option.value">{{ option.label }}</option> } }</select></label>
+          <label class="form-field"><span>Processing post office ID</span><input list="known-offices" type="text" [(ngModel)]="statusForm.postOfficeId" placeholder="Paste office UUID" required></label>
+          <datalist id="known-offices">@for (office of offices(); track office.id) { <option [value]="office.id">{{ office.name }} · {{ office.zipCode }}</option> }</datalist>
+        </div>
+        <footer class="dialog-footer"><button class="button button-quiet" type="button" (click)="closeDialog()">Cancel</button><button class="button button-primary" type="button" [disabled]="saving() || !statusForm.postOfficeId.trim()" (click)="saveStatus()">{{ saving() ? 'Updating...' : 'Update status' }}</button></footer>
+      } @else {
+        <div class="dialog-content">
+          @if (editingOfficeId) { <div class="readonly-banner"><span>Office ID</span><strong>{{ editingOfficeId }}</strong></div> }
+          <label class="form-field"><span>Post office name</span><input type="text" [(ngModel)]="officeForm.name" placeholder="Central Parcel Office" required></label>
+          <label class="form-field"><span>ZIP code</span><input type="text" [(ngModel)]="officeForm.zipCode" placeholder="10001" required></label>
+          <label class="form-field"><span>City</span><input type="text" [(ngModel)]="officeForm.city" placeholder="New York" required></label>
+        </div>
+        <footer class="dialog-footer"><button class="button button-quiet" type="button" (click)="closeDialog()">Cancel</button><button class="button button-primary" type="button" [disabled]="saving() || !officeForm.name.trim() || !officeForm.zipCode.trim() || !officeForm.city.trim()" (click)="saveOffice()">{{ saving() ? 'Saving...' : editingOfficeId ? 'Save changes' : 'Create post office' }}</button></footer>
+      }
+    </section>
+  </div>
+}

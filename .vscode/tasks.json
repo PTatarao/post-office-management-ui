@@ -1,0 +1,38 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Post Office UI",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".\\node_modules\\@angular\\cli\\bin\\ng.js",
+				"build",
+				"--progress=false"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Start Post Office UI",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".\\node_modules\\@angular\\cli\\bin\\ng.js",
+				"serve",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"4200"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$tsc-watch"
+			],
+			"group": "build"
+		}
+	]
+}
